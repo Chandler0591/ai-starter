@@ -28,7 +28,7 @@
 | --- | --- | --- | --- |
 | L0 静态 | `mvn -B compile`、`npx vue-tsc --noEmit` | 编译与类型 | 必须 0 error |
 | L1 单元 | JUnit（**待补**，见 §11） | `GuardrailService` 规则、`PromptRegistry` 版本解析/渲染、`MockEmbeddingModel` 向量确定性 | 关键分支 |
-| L2 集成 | 启动 + HTTP 冒烟（`tests/smoke.ps1`） | 认证、SSE、RAG、工具、RBAC、指标、评测 | 全绿 |
+| L2 集成 | 启动 + HTTP 冒烟（`npm run smoke`，脚本 `tests/smoke.mjs`） | 认证、SSE、RAG、工具、RBAC、指标、评测 | 全绿 |
 | L3 AI 回归 | `--eval=true` 启动即评测 / `POST /api/eval/run` | 提示词与检索参数变更不退化 | 4/4 通过 |
 | L4 端到端 | 浏览器走查（真实 DOM + 网络状态码） | 登录、连续对话无需刷新、菜单权限、看板、评测 | 无 JS 报错、无 4xx/5xx |
 | L5 非功能 | 并发、故障注入、容量 | 降级正确、连接不泄漏、指标可解释 | 见 §7 |
@@ -266,12 +266,13 @@ cd ..\frontend; npm run dev                                    # :5173（/api �
 | --- | --- |
 | 编译 / 类型 / 构建 | `mvn compile` 0 error；`vue-tsc --noEmit` 0 error；`vite build` 成功 |
 | 后端启动 | 成功，日志 0 ERROR；Flyway v1；PgVectorStore 自动建表；种子数据就绪 |
-| 冒烟脚本 11 步 | 全通过：登录（admin/user）、`me`、SSE RAG 命中、SSE 工具链、护栏拦截、USER 写知识库 403、知识列表、会话列表、看板 8 行指标、评测 4/4、Prometheus `ai_*` |
+| 冒烟脚本 11 步 | 全通过：登录（admin/user）、`me`、SSE RAG 命中、SSE 工具链、护栏拦截、USER 写知识库 403、知识列表、会话列表、看板 11 行指标、评测 4/4、Prometheus `ai_*` |
 | SSE 关闭语义 | 直连 `curl exit=0 / 0.66s / 2580B`；经 Vite 代理 `exit=0 / 0.38s` |
 | 浏览器走查（第一轮） | 发现 2 个缺陷（登录 415、SSE 后 UI 永久 loading），其余 10 项通过 |
 | 浏览器走查（修复后复检） | admin/user 登录均 200；**连续 4 轮对话无需刷新**，无残留 loading；21 次 API 全 200；0 JS 报错；菜单角色过滤正确；user 直敲 `/dashboard` 被守卫拦回 |
 | 指标增量样例 | `ai_llm_calls_total{type="stream"}` 4、`ai_llm_latency_seconds_max{type="stream"}=0.349`、`ai_llm_tokens_total{kind="prompt"}=2420`、`ai_rag_contexts_count` 5、`ai_tool_calls_total{tool="queryMyRecentOrders"}` 1、`ai_guardrail_blocked_total{reason="INJECTION"}` 2 |
 | 本轮追加验证（B9 加固后） | 不存在会话 → 单帧 `{"content":"会话不存在: 999999","done":true,"error":true}` 且 `curl exit=0`（流干净关闭）；user 拿 admin 的 sessionId 发对话 → 单帧 `无权访问该会话`；`ai_degradation_total{stage="prepare"}=2.0`；user 读 admin 会话消息 → 403 |
+| 回归脚本改用 Node（`.ps1` 下线） | `npm test` 全绿：smoke 11/11、verify-sse-errors 4/4、verify-rbac-rag 4/4（新增属主正向对照与帧数断言）；退出码已实测：全过 0，故意用错误口令跑为 1 |
 
 ### 已修复缺陷（回归用例已并入上文对应编号）
 
@@ -305,14 +306,18 @@ cd ..\frontend; npm run dev                                    # :5173（/api �
 
 ## 12. 附录：一键回归
 
-测试脚本统一集中在仓库根目录 `tests/`（文档统一在 `docs/`）：
+回归脚本统一集中在仓库根目录 `tests/`（文档统一在 `docs/`）。脚本用 Node ESM 写，只依赖内置 `fetch`（Node >= 18），
+不装任何第三方包，所以 Windows / macOS / Linux / CI 都是同一批文件同一条命令（早期版本是 PowerShell `.ps1`，已下线）：
 
-| 文件 | 作用 | 对应用例 |
-| --- | --- | --- |
-| `tests/smoke.ps1` | L2 主链路冒烟，11 步一次跑完（需后端已启动） | 认证 / SSE / RAG / 工具 / RBAC / 看板 / L3 评测 / 指标 |
-| `tests/cases/case-*.json` | `smoke.ps1` 的请求体语料（相对自身目录读取，整个 `tests/` 可任意搬迁） | TC-CHAT 系列、TC-GUARD 拦截、TC-TOOL 订单 |
-| `tests/verify-sse-errors.ps1` | B9 回归：前置阶段异常必须以 error 帧收尾 | TC-CHAT-09、TC-CHAT-10 |
-| `tests/verify-rbac-rag.ps1` | 数据级越权与向量重建幂等 | TC-AUTH-10、TC-RAG-06 |
+| 文件 | 作用 | 入口 | 对应用例 |
+| --- | --- | --- | --- |
+| `tests/lib.mjs` | 共用能力层：登录、JSON 请求、SSE 逐帧解析、Prometheus 文本取数、断言与用例计数 | 不直接跑 | — |
+| `tests/smoke.mjs` | L2 主链路冒烟，11 步一次跑完（需后端已启动） | `npm run smoke` | 认证 / SSE / RAG / 工具 / RBAC / 看板 / L3 评测 / 指标 |
+| `tests/cases/case-*.json` | `smoke.mjs` 的请求体语料（按脚本自身目录相对读取，整个 `tests/` 可任意搬迁） | — | TC-CHAT 系列、TC-GUARD 拦截、TC-TOOL 订单 |
+| `tests/verify-sse-errors.mjs` | B9 回归：前置阶段异常必须以 error 帧收尾 | `npm run verify:sse` | TC-CHAT-09、TC-CHAT-10 |
+| `tests/verify-rbac-rag.mjs` | 数据级越权（含正向对照）与向量重建幂等 | `npm run verify:rbac` | TC-AUTH-10、TC-RAG-06 |
+
+三个入口均可用 `BASE_URL` 改目标地址；全绿退 0，任一步失败退 1 并在末尾列出原因，可直接放进 CI。
 
 > 两处例外：L3 评测集 `eval-cases.json` 是运行期 classpath 资源（`EvalService` 从类路径加载），留在
 > `backend/src/main/resources/eval/`；后续补的 L1 JUnit 按 Maven 约定放 `backend/src/test/java/`，不入 `tests/`。
@@ -326,9 +331,8 @@ cd ..\frontend                  ; npx vue-tsc --noEmit; npm run build
 cd e:\codes\ai-starter          ; docker compose up -d
 cd backend                      ; mvn -B spring-boot:run                                  # 另开终端
 cd backend                      ; mvn -B spring-boot:run "-Dspring-boot.run.arguments=--eval=true"   # 门禁模式
-cd ..\tests                     ; .\smoke.ps1            # 主链路 11 步
-                                ; .\verify-sse-errors.ps1 # TC-CHAT-09 / TC-CHAT-10（B9 回归）
-                                ; .\verify-rbac-rag.ps1   # TC-AUTH-10 / TC-RAG-06
+cd ..                           ; npm test                    # smoke + verify:sse + verify:rbac
+                                                      # 只跑主链路：npm run smoke
 ```
 
 ```bash

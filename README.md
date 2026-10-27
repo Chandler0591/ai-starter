@@ -1,4 +1,4 @@
-# ai-starter · Spring Boot 4 + Spring AI 2 + Vue 3 的 AI 工程化全栈模板
+# Spring Boot 4 + Spring AI 2 + Vue 3 的 AI 工程化全栈模板
 
 保留 Java / Spring Boot 的既有工程能力（接口、数据库、事务、部署），在此之上补齐 **AI 工程化** 的那一半：
 模型接入、RAG、工具调用、护栏、评测、权限、可观测性。默认 **Mock Provider**，**不需要任何 API Key 就能把全链路跑通**；
@@ -24,9 +24,10 @@
 
 ```
 ai-starter/
+├── package.json                  # 根：只有 npm scripts，指向 tests/（零依赖）
 ├── docker-compose.yml            # pgvector 一键起
 ├── docs/                        # 架构 / 部署 / 测试计划 / 功能说明（文档只放这里）
-├── tests/                       # 测试脚本：smoke.ps1 + 专项验证 + cases 语料
+├── tests/                       # 回归脚本（Node ESM）：smoke + 两个专项 + cases 语料
 ├── backend/
 │   ├── pom.xml
 │   └── src/main/
@@ -74,17 +75,18 @@ npm run dev                    # http://localhost:5173（/api 已代理到 8080�
 
 登录后先试两句：`公司年假有几天？`（命中知识库 → RAG 作答）和 `帮我查一下我最近的订单状态`（触发工具读业务表）。
 
-一行命令把主链路冒烟一遍（登录 → SSE 对话 → 护栏拦截 → RBAC → 知识库 → 看板指标 → 评测 → Prometheus 抓取）：
+一行命令把主链路冒烟一遍（登录 → SSE 对话 → 护栏拦截 → RBAC → 知识库 → 看板指标 → 评测 → Prometheus 抓取）。
+回归脚本用 Node ESM 写成（只依赖内置 `fetch`，零第三方包），Windows / macOS / Linux 同一条命令：
 
-```powershell
-cd e:\codes\ai-starter\tests
-.\smoke.ps1                # 主链路冒烟（11 步）
-.\verify-sse-errors.ps1    # 专项：SSE 前置阶段出错必须回 error 帧（TC-CHAT-09/10）
-.\verify-rbac-rag.ps1      # 专项：越权读他人会话 403 + 重建索引不产生重复片段（TC-AUTH-10 / TC-RAG-06）
+```bash
+npm run smoke         # 主链路冒烟（11 步）
+npm run verify:sse    # 专项：SSE 前置阶段出错必须回 error 帧（TC-CHAT-09/10）
+npm run verify:rbac   # 专项：越权读他人会话 403 + 重建索引不产生重复片段（TC-AUTH-10 / TC-RAG-06）
+npm test              # 三个脚本一次跑完
 ```
 
-三个脚本均面向已启动的后端（默认 `http://localhost:8080`），退出码 0 即通过；具体用例清单见
-[docs/TEST-PLAN.md](docs/TEST-PLAN.md)。
+均面向已启动的后端（默认 `http://localhost:8080`，可用 `BASE_URL` 覆盖），退出码 0 即通过，
+失败时末尾会列出具体步骤原因；具体用例清单见 [docs/TEST-PLAN.md](docs/TEST-PLAN.md)。
 
 ## AI 工程化能力对照表
 

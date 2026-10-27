@@ -1,0 +1,16 @@
+{
+  "name": "ai-starter",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "AI 工程化全栈模板的回归脚本入口（跨平台、零第三方依赖）",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "smoke": "node tests/smoke.mjs",
+    "verify:sse": "node tests/verify-sse-errors.mjs",
+    "verify:rbac": "node tests/verify-rbac-rag.mjs",
+    "test": "node tests/smoke.mjs && node tests/verify-sse-errors.mjs && node tests/verify-rbac-rag.mjs"
+  }
+}

@@ -57,15 +57,16 @@ npm run dev                            # http://localhost:5173，/api 已代理�
 
 > 注意：启动日志里**不应**再出现 `Using generated security password`（说明 `AuthService` 已作为 `UserDetailsService` 生效）。
 
-冒烟一把梭（脚本集中在仓库根目录 `tests/`）：
+冒烟一把梭（回归脚本在仓库根目录 `tests/`，Node ESM 写的，零第三方依赖）：
 
-```powershell
-cd e:\codes\ai-starter\tests ; .\smoke.ps1
+```bash
+npm run smoke
 ```
 
 覆盖：登录 → SSE 对话（RAG 命中）→ 工具调用 → 护栏拦截 → RBAC 403 → 知识库列表 → 会话列表 → 看板指标 → 评测 4/4 → Prometheus 抓取 `ai_*`。
 
-另有 `verify-sse-errors.ps1`（SSE 前置阶段异常必须回 error 帧）与 `verify-rbac-rag.ps1`（数据级越权 + 向量重建幂等）两个专项脚本，同样从 `tests/` 直接执行。
+另有 `npm run verify:sse`（SSE 前置阶段异常必须回 error 帧）与 `npm run verify:rbac`（数据级越权 + 向量重建幂等）两个专项入口；
+`npm test` 把三个脚本串起来跑。目标地址默认 `http://localhost:8080`，可用 `BASE_URL` 环境变量改（部署到测试环境后直接 `BASE_URL=https://staging.example.com npm run smoke`）。
 
 ---
 
@@ -316,7 +317,7 @@ curl -s https://ai.example.com/api/knowledge -H "Authorization: Bearer $TOKEN" \
 | 回答里「知识库命中：0 段」但文档确实存在 | 阈值高于相似度（mock 字面量 or 换了 embedding 模型未标定）；或问题与文档用词差异大 | 看 `ai.rag.contexts`；调 `min-score` / `top-k`，或把文档写成条目化含关键词 |
 | 换模型后检索全空 | 向量表维度与新模型不符 | 按 §6 重建向量表与索引 |
 | `CREATE EXTENSION vector` 失败 | 账号无权限 / 镜像不带 pgvector | 用 `pgvector/pgvector:pg16`；或预先由特权账号建扩展 |
-| 中文在日志/响应里乱码 | 终端编码，非服务端问题 | PowerShell：`[Console]::OutputEncoding=[Text.Encoding]::UTF8`；接口本身 UTF-8 |
+| 中文在日志/响应里乱码 | 终端编码，非服务端问题 | PowerShell：`[Console]::OutputEncoding=[Text.Encoding]::UTF8`；接口本身 UTF-8。同理：把 `npm run smoke` 的输出重定向到文件（`> log.txt`）也会因 PowerShell 按 GBK 解码而乱码，直接看终端或先改 `[Console]::OutputEncoding` |
 | 评测未通过但启动失败于 CI | `--eval=true` 是门禁设计 | 修 Prompt/阈值/知识库，别关掉门禁 |
 
 ---
