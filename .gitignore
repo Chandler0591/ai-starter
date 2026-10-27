@@ -1,0 +1,25 @@
+# ---- Java / Maven ----
+target/
+*.class
+*.jar
+!.mvn/wrapper/maven-wrapper.jar
+*.log
+
+# ---- Node / Vue ----
+node_modules/
+frontend/dist/
+frontend/.vite/
+*.local
+
+# ---- IDE ----
+.idea/
+.vscode/
+*.iml
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
+
+# ---- 敏感配置 ----
+.env
+*.env.local

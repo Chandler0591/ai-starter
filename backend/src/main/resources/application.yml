@@ -1,0 +1,84 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: ai-starter
+
+  # ===== 业务数据 + 向量数据同库（PostgreSQL + pgvector）=====
+  datasource:
+    url: jdbc:postgresql://${PG_HOST:localhost}:${PG_PORT:5432}/${PG_DB:ai_starter}
+    username: ${PG_USER:ai_starter}
+    password: ${PG_PASSWORD:ai_starter}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  # ===== 模型接入：OpenAI 兼容通道（可指向 DeepSeek / 通义 / 自建网关）=====
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:sk-demo}
+      base-url: ${OPENAI_BASE_URL:https://api.openai.com}
+      chat:
+        options:
+          model: ${OPENAI_CHAT_MODEL:gpt-4o-mini}
+          temperature: 0.3
+      embedding:
+        options:
+          model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+    vectorstore:
+      pgvector:
+        initialize-schema: true
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        dimensions: ${AI_EMBEDDING_DIMENSION:1536}
+        schema-name: public
+        table-name: ai_document_embedding
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when_authorized
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+# ===== AI 工程化开关 =====
+ai:
+  # mock：无需 API Key 即可跑通全链路；openai：走真实模型
+  provider: ${AI_PROVIDER:mock}
+  timeout-ms: 30000
+  # 多轮记忆携带的历史消息条数
+  max-history: 8
+  guardrail:
+    max-input-chars: 4000
+  rag:
+    top-k: 4
+    min-score: 0.65
+    chunk-size: 400
+  embedding:
+    dimension: ${AI_EMBEDDING_DIMENSION:1536}
+  mock:
+    # 模拟推理耗时（毫秒）：让 ai.llm.latency 在离线演示时也是真实量级
+    latency-ms: ${AI_MOCK_LATENCY_MS:200}
+
+jwt:
+  secret: ${JWT_SECRET:change-me-in-production-please-use-a-long-random-secret-key-256bit}
+  expire-minutes: ${JWT_EXPIRE_MINUTES:120}
+
+logging:
+  pattern:
+    console: "%clr(%d{HH:mm:ss.SSS}){faint} %clr(%5p) %clr([%X{traceId:-}]){yellow} %clr(%-40.40logger{39}){cyan} : %msg%n"
+  level:
+    com.aistarter: INFO

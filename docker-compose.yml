@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: ai-starter-pg
+    environment:
+      POSTGRES_DB: ai_starter
+      POSTGRES_USER: ai_starter
+      POSTGRES_PASSWORD: ai_starter
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ai_starter -d ai_starter"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pg-data:
